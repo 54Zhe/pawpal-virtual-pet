@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>小爪伙伴 · 虚拟宠物养成</title>
+<style>
+/* ============ 基础与主题 ============ */
+:root{
+  --bg1:#fdf6ec; --bg2:#ffe8d6;
+  --panel:#ffffff; --ink:#4a3b32; --ink-soft:#8a7668;
+  --accent:#ff8c69; --accent2:#ffb347;
+  --ok:#5cb85c; --warn:#f0ad4e; --bad:#e05d5d;
+  --radius:18px;
+  --shadow:0 8px 24px rgba(190,140,90,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:linear-gradient(160deg,var(--bg1),var(--bg2));
+  color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;
+  min-height:100%;overflow-x:hidden;
+  transition:background .6s;
+}
+body.night{background:linear-gradient(160deg,#2b2d42,#3d405b)}
+
+/* ============ 顶栏 ============ */
+header{
+  width:100%;max-width:480px;padding:14px 18px 6px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+h1{font-size:1.15rem;letter-spacing:.5px}
+.hud{display:flex;gap:10px;font-size:.85rem;font-weight:600}
+.hud span{background:var(--panel);border-radius:999px;padding:4px 12px;box-shadow:var(--shadow)}
+body.night .hud span{background:#3d405b;color:#e8e8f0}
+
+/* ============ 宠物舞台 ============ */
+.stage{
+  width:100%;max-width:480px;position:relative;
+  height:300px;display:flex;align-items:flex-end;justify-content:center;
+}
+.ground{
+  position:absolute;bottom:28px;width:78%;height:64px;
+  background:radial-gradient(ellipse at center,rgba(160,110,70,.28),transparent 70%);
+  border-radius:50%;
+}
+#pet{
+  position:relative;font-size:110px;line-height:1;cursor:pointer;
+  user-select:none;filter:drop-shadow(0 10px 10px rgba(0,0,0,.12));
+  animation:bob 2.6s ease-in-out infinite;
+  transition:font-size .8s, filter .4s;
+}
+#pet:hover{transform:scale(1.05)}
+@keyframes bob{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-12px)}
+}
+#pet.sleeping{animation:breathe 3.5s ease-in-out infinite}
+@keyframes breathe{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.06)}
+}
+#pet.sick{filter:grayscale(.6) drop-shadow(0 10px 10px rgba(0,0,0,.12));animation:shiver .5s ease-in-out infinite}
+@keyframes shiver{
+  0%,100%{transform:rotate(-2deg)}
+  50%{transform:rotate(2deg)}
+}
+#pet.dirty::after{
+  content:"💩";position:absolute;right:-18px;bottom:0;font-size:28px;
+}
+/* 心情气泡 */
+#mood{
+  position:absolute;top:30px;left:50%;transform:translateX(-50%);
+  font-size:30px;opacity:0;transition:opacity .3s;pointer-events:none;
+  animation:floatUp 1.6s ease-out infinite;
+}
+@keyframes floatUp{
+  0%{transform:translate(-50%,6px)}
+  100%{transform:translate(-50%,-14px)}
+}
+/* 特效粒子容器 */
+#fx{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.particle{
+  position:absolute;font-size:22px;
+  animation:pop 1.2s ease-out forwards;
+}
+@keyframes pop{
+  0%{opacity:0;transform:translateY(0) scale(.5)}
+  20%{opacity:1}
+  100%{opacity:0;transform:translateY(-90px) scale(1.3)}
+}
+/* Zzz */
+.zzz{
+  position:absolute;top:60px;left:58%;font-size:22px;color:#7c8cf8;
+  animation:zzzf 2s ease-out infinite;opacity:0;
+}
+.zzz:nth-child(2){animation-delay:.6s;font-size:26px}
+.zzz:nth-child(3){animation-delay:1.2s;font-size:30px}
+@keyframes zzzf{
+  0%{opacity:0;transform:translate(0,0)}
+  30%{opacity:1}
+  100%{opacity:0;transform:translate(24px,-50px)}
+}
+
+/* ============ 状态面板 ============ */
+.panel{
+  width:100%;max-width:480px;background:var(--panel);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:16px 18px;margin-top:4px;
+}
+body.night .panel{background:#3d405b;color:#e8e8f0}
+.stage-info{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.stage-info .name{font-size:1.05rem;font-weight:700}
+.stage-info .lvl{font-size:.8rem;color:var(--ink-soft)}
+body.night .stage-info .lvl{color:#b9bcd0}
+.xpbar{height:6px;background:#f0e4d8;border-radius:99px;overflow:hidden;margin-bottom:14px}
+body.night .xpbar{background:#555879}
+.xpbar>div{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:99px;transition:width .5s}
+
+.stat{display:flex;align-items:center;gap:10px;margin:8px 0}
+.stat .ico{width:26px;text-align:center;font-size:17px}
+.stat .lbl{width:44px;font-size:.82rem;font-weight:600}
+.bar{flex:1;height:12px;background:#f0e4d8;border-radius:99px;overflow:hidden}
+body.night .bar{background:#555879}
+.bar>div{height:100%;border-radius:99px;transition:width .4s,background-color .4s}
+.stat .val{width:38px;text-align:right;font-size:.78rem;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+body.night .stat .val{color:#b9bcd0}
+
+/* ============ 操作按钮 ============ */
+.actions{
+  width:100%;max-width:480px;margin:14px 0 6px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 4px;
+}
+.btn{
+  border:none;border-radius:var(--radius);background:var(--panel);
+  box-shadow:var(--shadow);padding:12px 4px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-family:inherit;color:var(--ink);font-size:.8rem;font-weight:600;
+  transition:transform .15s, box-shadow .15s;
+}
+body.night .btn{background:#3d405b;color:#e8e8f0}
+.btn .e{font-size:26px}
+.btn:active{transform:scale(.93)}
+.btn.active{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ============ 日志 ============ */
+.log{
+  width:100%;max-width:480px;margin:4px 0 18px;padding:0 6px;
+  font-size:.76rem;color:var(--ink-soft);max-height:74px;overflow-y:auto;
+}
+body.night .log{color:#b9bcd0}
+.log p{padding:2px 0;border-bottom:1px dashed rgba(0,0,0,.06)}
+
+/* ============ 弹层（离线结算/命名） ============ */
+.overlay{
+  position:fixed;inset:0;background:rgba(60,40,30,.45);
+  display:none;align-items:center;justify-content:center;z-index:50;padding:20px;
+}
+.overlay.show{display:flex}
+.card{
+  background:var(--panel);border-radius:22px;padding:26px 24px;
+  max-width:340px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25);
+  animation:cardIn .35s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes cardIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+.card h2{font-size:1.1rem;margin-bottom:8px}
+.card .big{font-size:52px;margin:6px 0}
+.card p{font-size:.85rem;color:var(--ink-soft);line-height:1.7;margin:8px 0}
+.card input{
+  width:100%;padding:10px 14px;border:2px solid #ecd9c5;border-radius:12px;
+  font-size:1rem;text-align:center;margin:10px 0;outline:none;font-family:inherit;
+}
+.card input:focus{border-color:var(--accent)}
+.card button{
+  border:none;background:linear-gradient(135deg,var(--accent2),var(--accent));
+  color:#fff;font-weight:700;font-size:.95rem;border-radius:99px;
+  padding:11px 34px;cursor:pointer;font-family:inherit;margin-top:6px;
+}
+.card button:active{transform:scale(.95)}
+.delta{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0}
+.delta span{font-size:.8rem;background:#fdf0e6;border-radius:10px;padding:5px 10px}
+
+/* 说话气泡 */
+#bubble{
+  position:absolute;top:58px;left:50%;transform:translateX(-50%) scale(.8);
+  background:#fff;color:var(--ink);padding:8px 14px;border-radius:16px;
+  font-size:.82rem;font-weight:600;box-shadow:var(--shadow);
+  opacity:0;transition:all .3s;pointer-events:none;max-width:230px;text-align:center;
+  z-index:5;white-space:nowrap;
+}
+#bubble::after{
+  content:"";position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  border:8px solid transparent;border-top-color:#fff;border-bottom:none;
+}
+#bubble.show{opacity:1;transform:translateX(-50%) scale(1)}
+body.night #bubble{background:#555879;color:#fff}
+body.night #bubble::after{border-top-color:#555879}
+
+/* 陪玩小游戏 */
+#gPet{
+  font-size:104px;cursor:pointer;user-select:none;margin:8px 0;line-height:1.2;
+  animation:bob 1s ease-in-out infinite;transition:transform .08s;
+}
+#gPet:active{transform:scale(.88)}
+#gScore{font-size:1.35rem;font-weight:800;color:var(--accent);margin:4px 0;min-height:1.5em}
+.gbar{height:8px;background:#f0e4d8;border-radius:99px;overflow:hidden;margin:10px 0}
+.gbar>div{height:100%;width:100%;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+
+/* 装扮（叠加在宠物身上的饰品） */
+.outfit{position:absolute;left:50%;transform:translateX(-50%);
+  font-size:.45em;pointer-events:none;z-index:2;line-height:1}
+.o-hat{top:-.12em}
+.o-glasses{top:.32em}
+.o-neck{top:.62em}
+
+/* 装扮商店 */
+.shopcard{max-width:380px;max-height:82vh;overflow-y:auto}
+.shopgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.sitem{background:#fdf0e6;border-radius:14px;padding:10px 4px;font-size:.72rem;
+  font-weight:600;cursor:pointer;transition:transform .15s;color:var(--ink);line-height:1.5}
+.sitem:hover{transform:scale(1.05)}
+.sitem .si{display:block;font-size:30px;margin-bottom:2px}
+.sitem.owned{background:#e6f4e0}
+.sitem.equipped{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff}
+.shopcoin{font-weight:700;color:var(--accent)}
+
+/* 选物种 */
+.spgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 4px}
+.sp{background:#fdf0e6;border-radius:14px;padding:10px 4px;cursor:pointer;
+  font-size:.8rem;font-weight:600;transition:transform .15s,background .15s;color:var(--ink)}
+.sp span{display:block;font-size:34px;margin-bottom:4px}
+.sp:hover{transform:scale(1.06);background:#ffe3cd}
+
+/* toast */
+#toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--ink);color:#fff;padding:10px 22px;border-radius:99px;
+  font-size:.85rem;opacity:0;transition:all .35s;z-index:60;pointer-events:none;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:380px){#pet{font-size:92px}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🐾 小爪伙伴</h1>
+  <div class="hud"><span id="hudCoin">🪙 0</span><span id="hudDay">📅 第 1 天</span></div>
+</header>
+
+<div class="stage">
+  <div class="ground"></div>
+  <div id="fx"></div>
+  <div id="mood">❤️</div>
+  <div id="bubble"></div>
+  <div id="pet" title="点我摸摸头">🥚</div>
+  <div class="zzz" id="z1" style="display:none">Z</div>
+  <div class="zzz" id="z2" style="display:none">z</div>
+  <div class="zzz" id="z3" style="display:none">z</div>
+</div>
+
+<div class="panel">
+  <div class="stage-info">
+    <span class="name" id="petName">未命名</span>
+    <span class="lvl" id="petStage">蛋 · Lv.1</span>
+  </div>
+  <div class="xpbar"><div id="xpFill"></div></div>
+  <div class="stat"><span class="ico">🍖</span><span class="lbl">饱食</span><div class="bar"><div id="bHunger"></div></div><span class="val" id="vHunger">0</span></div>
+  <div class="stat"><span class="ico">🛁</span><span class="lbl">清洁</span><div class="bar"><div id="bClean"></div></div><span class="val" id="vClean">0</span></div>
+  <div class="stat"><span class="ico">🎾</span><span class="lbl">心情</span><div class="bar"><div id="bHappy"></div></div><span class="val" id="vHappy">0</span></div>
+  <div class="stat"><span class="ico">⚡</span><span class="lbl">精力</span><div class="bar"><div id="bEnergy"></div></div><span class="val" id="vEnergy">0</span></div>
+  <div class="stat"><span class="ico">💊</span><span class="lbl">健康</span><div class="bar"><div id="bHealth"></div></div><span class="val" id="vHealth">0</span></div>
+</div>
+
+<div class="actions">
+  <button class="btn" id="btnFeed"><span class="e">🍖</span>喂食</button>
+  <button class="btn" id="btnClean"><span class="e">🛁</span>洗澡</button>
+  <button class="btn" id="btnPlay"><span class="e">🎾</span>陪玩</button>
+  <button class="btn" id="btnSleep"><span class="e">😴</span>睡觉</button>
+  <button class="btn" id="btnHeal"><span class="e">💊</span>看病</button>
+  <button class="btn" id="btnSnack"><span class="e">🍬</span>零食</button>
+  <button class="btn" id="btnTrain"><span class="e">🎓</span>训练</button>
+  <button class="btn" id="btnDress"><span class="e">👗</span>装扮</button>
+  <button class="btn" id="btnRename"><span class="e">✏️</span>改名</button>
+  <button class="btn" id="btnReset"><span class="e">🔄</span>重置</button>
+</div>
+
+<div class="log" id="log"></div>
+
+<!-- 选物种弹层 -->
+<div class="overlay" id="spOverlay">
+  <div class="card">
+    <div class="big">🥚</div>
+    <h2>选择你的宠物蛋</h2>
+    <p>它会一路成长：蛋 → 幼崽 → 少年 → 成年 → 王者</p>
+    <div class="spgrid">
+      <div class="sp" data-idx="0" data-name="鸟系"><span>🦅</span>鸟系</div>
+      <div class="sp" data-idx="1" data-name="犬系"><span>🐺</span>犬系</div>
+      <div class="sp" data-idx="2" data-name="猫系"><span>🦁</span>猫系</div>
+      <div class="sp" data-idx="3" data-name="兔系"><span>🦄</span>兔系</div>
+      <div class="sp" data-idx="4" data-name="龙系"><span>🐉</span>龙系</div>
+      <div class="sp" data-idx="r" data-name="随机"><span>🎲</span>随机</div>
+    </div>
+  </div>
+</div>
+
+<!-- 陪玩小游戏弹层 -->
+<div class="overlay" id="gameOverlay">
+  <div class="card">
+    <h2 id="gTitle">🎾 陪玩时间！</h2>
+    <p id="gDesc">10 秒内疯狂点它，攒爱心换奖励！</p>
+    <div id="gPet">🐶</div>
+    <div id="gScore">❤️ 0</div>
+    <div class="gbar"><div id="gTime"></div></div>
+    <button id="gBtn">开始！</button>
+  </div>
+</div>
+
+<!-- 装扮商店弹层 -->
+<div class="overlay" id="shopOverlay">
+  <div class="card shopcard">
+    <div class="big">👗</div>
+    <h2>装扮商店</h2>
+    <p>我的金币：<span class="shopcoin">🪙 <span id="shopCoin">0</span></span></p>
+    <div class="shopgrid" id="shopGrid"></div>
+    <button onclick="closeShop()">关闭</button>
+  </div>
+</div>
+
+<!-- 命名弹层 -->
+<div class="overlay" id="nameOverlay">
+  <div class="card">
+    <div class="big">🥚</div>
+    <h2 id="nameTitle">你的宠物蛋即将孵化！</h2>
+    <p id="nameDesc">给它起个名字吧</p>
+    <input id="nameInput" maxlength="8" placeholder="例如：团子">
+    <button id="nameOk">确定</button>
+  </div>
+</div>
+
+<!-- 离线结算弹层 -->
+<div class="overlay" id="awayOverlay">
+  <div class="card">
+    <div class="big">🏠</div>
+    <h2>欢迎回来！</h2>
+    <p id="awayTime"></p>
+    <div class="delta" id="awayDelta"></div>
+    <p id="awayNote"></p>
+    <button onclick="closeAway()">知道啦</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * 虚拟宠物 · 单文件版
+ * 要点：
+ *  - localStorage 保存全部状态 + lastTick 时间戳
+ *  - visibilitychange：隐藏时记录时间并暂停 CSS 动画（animation-play-state）
+ *  - 回到前台：按真实流逝时间做离线结算（时间差补偿），恢复动画
+ *  - 后台 tab 的 setInterval 被浏览器节流无所谓，因为结算只看时间戳
+ * ===================================================================== */
+
+const SAVE_KEY = "pawpal.v1";
+const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
+
+/* ---------- 成长阶段 ---------- */
+const STAGES = [
+  { name: "蛋",   emoji: "🥚", needXP: 0,   size: 90  },
+  { name: "幼崽", emoji: "🐣", needXP: 30,  size: 100 },
+  { name: "少年", emoji: "🐥", needXP: 90,  size: 112 },
+  { name: "成年", emoji: "🐔", needXP: 200, size: 124 },
+  { name: "王者", emoji: "🦅", needXP: 400, size: 132 },
+];
+/* 随机物种（孵化时确定） */
+const SPECIES = [
+  ["🥚","🐣","🐥","🐔","🦅"],
+  ["🥚","🐶","🐕","🦮","🐺"],
+  ["🥚","🐱","🐈","🐯","🦁"],
+  ["🥚","🐰","🐇","🦘","🦄"],
+  ["🥚","🐸","🦎","🐊","🐉"],
+];
+const STAGE_NAMES = ["蛋","幼崽","少年","成年","王者"];
+
+/* ---------- 装扮商品（三槽位：帽子 / 眼镜 / 颈部） ---------- */
+const ITEMS = [
+  { id:"cap",     slot:"hat",     emoji:"🧢", name:"棒球帽", price:20 },
+  { id:"bow",     slot:"hat",     emoji:"🎀", name:"蝴蝶结", price:25 },
+  { id:"tophat",  slot:"hat",     emoji:"🎩", name:"绅士帽", price:35 },
+  { id:"flower",  slot:"hat",     emoji:"🌸", name:"小樱花", price:15 },
+  { id:"gradhat", slot:"hat",     emoji:"🎓", name:"学士帽", price:40 },
+  { id:"crown",   slot:"hat",     emoji:"👑", name:"皇冠",   price:80 },
+  { id:"glasses", slot:"glasses", emoji:"👓", name:"圆眼镜", price:25 },
+  { id:"shades",  slot:"glasses", emoji:"🕶️", name:"墨镜",   price:40 },
+  { id:"scarf",   slot:"neck",    emoji:"🧣", name:"红围巾", price:20 },
+  { id:"bowtie",  slot:"neck",    emoji:"🎗️", name:"领结",   price:30 },
+  { id:"medal",   slot:"neck",    emoji:"🏅", name:"奖牌",   price:50 },
+];
+
+/* ---------- 宠物台词库 ---------- */
+const LINES = {
+  hungry: ["肚子咕咕叫了…", "想吃肉肉！🍖", "饭饭呢？我的饭饭呢？", "饿扁了…"],
+  dirty:  ["我臭臭的了…", "想洗香香 🛁", "身上痒痒的…", "该洗澡啦！"],
+  sad:    ["好无聊呀…", "陪我玩嘛 🥺", "主人是不是不爱我了", "一个人好寂寞…"],
+  tired:  ["好困…想睡觉 💤", "眼皮在打架…", "让我眯一会儿…"],
+  sick:   ["头好晕…😷", "我不舒服…", "带我去看看嘛…", "浑身没力气…"],
+  happy:  ["今天心情超好！", "最喜欢主人了！❤️", "啦啦啦～♪", "幸福到冒泡！"],
+  idle:   ["你在看什么呀？", "陪我聊聊天嘛", "今天天气真好 ☀️", "咕噜咕噜～", "想出去玩！", "主人在忙吗？", "我可爱吗？😊"],
+  pat:    ["好舒服～", "再摸一下！", "蹭蹭你 ❤️", "嘿嘿，好痒！", "最爱摸头了！", "呼噜呼噜…"],
+  feed:   ["啊呜啊呜…好吃！", "太香了！", "还要还要！", "这个我爱吃！"],
+  clean:  ["哇，好舒服～", "香香的了！", "泡泡好好玩 🫧", "冲干净啦！"],
+  play:   ["太好玩啦！", "再来一次！", "耶！", "跟你玩最开心了！"],
+  train:  ["我变强了！", "认真学习 ing", "好累…但有收获！", "看我多棒！"],
+  heal:   ["感觉好多了…", "药药苦…但有用", "谢谢主人 ❤️", "我会快点好起来的"],
+  sleep:  ["晚安…💤", "做个好梦…", "呼…呼…"],
+  wake:   ["早上好！☀️", "睡得好饱！", "元气满满！"],
+};
+
+/* ---------- 说话气泡 ---------- */
+let speakTO = null, lastSpeak = 0;
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function speak(text, dur){
+  const b = document.getElementById("bubble");
+  b.textContent = text;
+  b.classList.add("show");
+  lastSpeak = Date.now();
+  clearTimeout(speakTO);
+  speakTO = setTimeout(() => b.classList.remove("show"), dur || 2800);
+}
+/* 环境闲聊：按状态优先级挑台词，25 秒冷却 */
+function ambientChatter(){
+  if(stageIdx() === 0 || S.sleeping) return;      // 蛋不会说话，睡觉不打扰
+  if(Date.now() - lastSpeak < 25000) return;
+  if(document.querySelector(".overlay.show")) return;
+  if(Math.random() > 0.3) return;
+  let pool;
+  if(S.sick)            pool = LINES.sick;
+  else if(S.hunger < 25) pool = LINES.hungry;
+  else if(S.clean < 25)  pool = LINES.dirty;
+  else if(S.happy < 25)  pool = LINES.sad;
+  else if(S.energy < 15) pool = LINES.tired;
+  else if(S.happy > 80)  pool = LINES.happy;
+  else                   pool = LINES.idle;
+  speak(pick(pool));
+}
+
+/* ---------- 默认状态 ---------- */
+function defaultState(){
+  return {
+    name: "", species: Math.floor(Math.random()*SPECIES.length), speciesChosen: false,
+    hunger: 80, clean: 80, happy: 80, energy: 80, health: 100,
+    xp: 0, coins: 20, bornAt: Date.now(),
+    sleeping: false, sick: false,
+    wardrobe: [], equipped: { hat: null, glasses: null, neck: null },
+    lastTick: Date.now(), hatchAsked: false
+  };
+}
+let S = load();
+
+/* ---------- 存档 ---------- */
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return defaultState();
+    const s = JSON.parse(raw);
+    /* 老存档没有 speciesChosen 字段，视为已选定（沿用原宠物） */
+    if(s.speciesChosen === undefined) s.speciesChosen = true;
+    /* 防御：补全字段 */
+    return Object.assign(defaultState(), s);
+  }catch(e){ return defaultState(); }
+}
+let skipSave = false; // 重置清档后置 true，阻止 beforeunload 等把旧状态写回
+function save(){
+  if(skipSave) return;
+  S.lastTick = Date.now();
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){}
+}
+
+/* ---------- 衰减速率（每分钟，醒着时） ---------- */
+const DECAY = { hunger: 0.5, clean: 0.3, happy: 0.45, energy: 0.2 };
+const DECAY_SLEEP = { hunger: 0.2, clean: 0.1, happy: 0.1, energy: -1.2 }; // 负数=恢复
+
+/* ---------- 核心：按流逝时间结算 ---------- */
+function tick(msElapsed){
+  const mins = msElapsed / 60000;
+  if(mins <= 0) return;
+  const rate = S.sleeping ? DECAY_SLEEP : DECAY;
+  S.hunger = clamp(S.hunger - rate.hunger * mins);
+  S.clean  = clamp(S.clean  - rate.clean  * mins);
+  S.happy  = clamp(S.happy  - rate.happy  * mins);
+  S.energy = clamp(S.energy - rate.energy * mins);
+
+  /* 健康联动：饿/脏/郁闷会掉健康；都还行则缓慢恢复 */
+  const neglect =
+    (S.hunger < 20 ? 1 : 0) + (S.clean < 20 ? 1 : 0) + (S.happy < 20 ? 1 : 0);
+  if(neglect > 0){
+    S.health = clamp(S.health - 0.8 * neglect * mins);
+  }else if(S.hunger > 50 && S.clean > 50){
+    S.health = clamp(S.health + 0.15 * mins);
+  }
+  /* 生病判定 */
+  if(S.health <= 30 && !S.sick){ S.sick = true; pushLog("😷 " + petName() + " 生病了，快用「看病」治疗！"); }
+  if(S.health > 60 && S.sick){ S.sick = false; pushLog("✨ " + petName() + " 恢复健康啦！"); }
+  /* 睡够了自然醒 */
+  if(S.sleeping && S.energy >= 100){ S.sleeping = false; pushLog("☀️ " + petName() + " 睡饱了自己醒来了！"); }
+}
+
+/* ---------- 离线/切后台结算（时间差补偿） ---------- */
+function settleAway(showModal){
+  const now = Date.now();
+  const elapsed = now - (S.lastTick || now);
+  if(elapsed < 5000) return; // 5 秒内忽略不计
+  const before = { hunger:S.hunger, clean:S.clean, happy:S.happy, energy:S.energy, health:S.health };
+  tick(elapsed);
+  save(); render();
+  if(showModal && elapsed > 60000){
+    document.getElementById("awayTime").textContent =
+      "你离开了 " + fmtDuration(elapsed) + "，" + petName() + " 独自在家等你。";
+    const d = document.getElementById("awayDelta");
+    d.innerHTML = "";
+    const items = [
+      ["🍖","hunger"],["🛁","clean"],["🎾","happy"],["⚡","energy"],["💊","health"]
+    ];
+    for(const [ico,key] of items){
+      const diff = Math.round(S[key] - before[key]);
+      if(diff !== 0){
+        const sp = document.createElement("span");
+        sp.textContent = ico + " " + (diff > 0 ? "+" : "") + diff;
+        d.appendChild(sp);
+      }
+    }
+    document.getElementById("awayNote").textContent =
+      S.sick ? "它看起来病恹恹的，快带它看病吧！" :
+      S.happy > 60 ? "见到你回来，它开心地摇尾巴～" : "它有点想你，多陪陪它吧。";
+    document.getElementById("awayOverlay").classList.add("show");
+  }
+}
+function closeAway(){ document.getElementById("awayOverlay").classList.remove("show"); }
+
+function fmtDuration(ms){
+  const m = Math.floor(ms/60000);
+  if(m < 1) return "不到 1 分钟";
+  if(m < 60) return m + " 分钟";
+  const h = Math.floor(m/60);
+  if(h < 24) return h + " 小时 " + (m%60) + " 分钟";
+  return Math.floor(h/24) + " 天 " + (h%24) + " 小时";
+}
+
+/* ---------- Page Visibility：暂停/恢复 CSS 动画 + 补偿 ---------- */
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden){
+    /* 后台 tab：暂停所有 CSS 动画，落盘当前时间戳 */
+    document.querySelectorAll("#pet, #mood, .zzz, .particle").forEach(el => {
+      el.style.animationPlayState = "paused";
+    });
+    save();
+  }else{
+    /* 回前台：先按时间戳结算，再恢复动画 */
+    settleAway(true);
+    document.querySelectorAll("#pet, #mood, .zzz, .particle").forEach(el => {
+      el.style.animationPlayState = "running";
+    });
+  }
+});
+/* 浏览器直接刷新/关闭时兜底 */
+window.addEventListener("beforeunload", save);
+
+/* ---------- 成长 ---------- */
+function stageIdx(){
+  let i = 0;
+  for(let k = 0; k < STAGES.length; k++) if(S.xp >= STAGES[k].needXP) i = k;
+  return i;
+}
+function gainXP(n){
+  const oldStage = stageIdx();
+  S.xp += n;
+  const ns = stageIdx();
+  if(ns > oldStage){
+    S.coins += 15;
+    pushLog("🎉 " + petName() + " 成长到「" + STAGE_NAMES[ns] + "」阶段！奖励 15 🪙");
+    toast("🎉 成长啦！" + STAGE_NAMES[ns]);
+    burst("✨", 8);
+  }
+}
+
+/* ---------- 操作 ---------- */
+const COOLDOWN = {};
+function canAct(key, cd){
+  const now = Date.now();
+  if(COOLDOWN[key] && now - COOLDOWN[key] < cd) return false;
+  COOLDOWN[key] = now; return true;
+}
+function needAwake(){
+  if(S.sleeping){ toast("😴 它睡着了，先叫醒它吧"); return false; }
+  return true;
+}
+function stage0Block(){
+  if(stageIdx() === 0){ toast("🥚 还是颗蛋呢，多点它几下催孵化！"); return false; }
+  return true;
+}
+
+const ACTIONS = {
+  feed(){
+    if(!needAwake() || !stage0Block()) return;
+    if(S.hunger > 95){ toast("🍖 吃不下了，好撑！"); return; }
+    S.hunger = clamp(S.hunger + 22); S.coins = Math.max(0, S.coins - 2);
+    S.clean = clamp(S.clean - 4);
+    gainXP(3); burst("🍖", 3); mood("😋");
+    speak(pick(LINES.feed));
+    pushLog("🍖 喂了一顿大餐，饱食 +22，花费 2 🪙");
+  },
+  snack(){
+    if(!needAwake() || !stage0Block()) return;
+    S.happy = clamp(S.happy + 8); S.hunger = clamp(S.hunger + 6);
+    S.health = clamp(S.health - 2); S.coins = Math.max(0, S.coins - 1);
+    gainXP(1); burst("🍬", 3); mood("😍");
+    speak(pick(LINES.feed));
+    pushLog("🍬 吃了零食超开心，但糖分有点高哦");
+  },
+  clean(){
+    if(!needAwake() || !stage0Block()) return;
+    if(S.clean > 95){ toast("🛁 已经很干净啦！"); return; }
+    S.clean = clamp(S.clean + 30); S.happy = clamp(S.happy - 3);
+    gainXP(3); burst("🫧", 5); mood("🥰");
+    speak(pick(LINES.clean));
+    pushLog("🛁 洗了个泡泡浴，清洁 +30");
+  },
+  train(){
+    if(!needAwake() || !stage0Block()) return;
+    if(!canAct("train", 30000)){ toast("🎓 训练要循序渐进，歇 30 秒"); return; }
+    if(S.energy < 20){ toast("⚡ 精力不足，没法训练"); return; }
+    S.energy = clamp(S.energy - 15); S.hunger = clamp(S.hunger - 6);
+    gainXP(10); S.coins += 5;
+    burst("🎓", 4); mood("🤓");
+    speak(pick(LINES.train));
+    pushLog("🎓 完成一次训练！经验 +10，奖励 5 🪙");
+  },
+  heal(){
+    if(!stage0Block()) return;
+    if(S.health > 90 && !S.sick){ toast("💊 健健康康，不用吃药"); return; }
+    if(S.coins < 10){ toast("🪙 金币不够 10 枚，去陪玩/训练赚钱吧"); return; }
+    S.coins -= 10; S.health = clamp(S.health + 40);
+    if(S.health > 60) S.sick = false;
+    burst("💊", 4); mood("😌");
+    speak(pick(LINES.heal));
+    pushLog("💊 看了医生吃了药，健康 +40，花费 10 🪙");
+  },
+  sleep(){
+    if(stage0Block() === false && stageIdx() === 0){ /* 蛋也能睡 */ }
+    S.sleeping = !S.sleeping;
+    if(stageIdx() > 0) speak(pick(S.sleeping ? LINES.sleep : LINES.wake));
+    pushLog(S.sleeping ? "🌙 " + petName() + " 进入梦乡…" : "☀️ " + petName() + " 醒了！");
+  },
+};
+
+/* ---------- 交互绑定 ---------- */
+document.getElementById("btnFeed").onclick  = () => { ACTIONS.feed();  afterAct(); };
+document.getElementById("btnSnack").onclick = () => { ACTIONS.snack(); afterAct(); };
+document.getElementById("btnClean").onclick = () => { ACTIONS.clean(); afterAct(); };
+document.getElementById("btnPlay").onclick  = openGame;
+document.getElementById("btnTrain").onclick = () => { ACTIONS.train(); afterAct(); };
+document.getElementById("btnHeal").onclick  = () => { ACTIONS.heal();  afterAct(); };
+document.getElementById("btnSleep").onclick = () => { ACTIONS.sleep(); afterAct(); };
+document.getElementById("btnRename").onclick = () => {
+  document.getElementById("nameTitle").textContent = "给 " + petName() + " 改个名字";
+  document.getElementById("nameDesc").textContent = "新名字（最多 8 个字）";
+  document.getElementById("nameInput").value = S.name;
+  document.getElementById("nameOverlay").classList.add("show");
+};
+
+/* 点宠物：摸头 / 催孵化 */
+let patCount = 0, patTimer = null;
+document.getElementById("pet").addEventListener("click", () => {
+  if(stageIdx() === 0){
+    patCount++;
+    burst("💫", 2);
+    if(patCount >= 8){
+      gainXP(30); // 直接孵化到幼崽
+      patCount = 0;
+      pushLog("🐣 蛋壳裂开啦！一只小可爱钻了出来！");
+      toast("🐣 孵化成功！");
+      if(!S.hatchAsked){
+        S.hatchAsked = true;
+        setTimeout(() => document.getElementById("nameOverlay").classList.add("show"), 600);
+      }
+    }else{
+      toast("🥚 壳在晃动… (" + patCount + "/8)");
+    }
+  }else{
+    S.happy = clamp(S.happy + 3);
+    mood("❤️"); burst("💕", 2);
+    if(S.sleeping){
+      toast("😴 它睡着了，轻一点…");
+    }else if(Date.now() - lastSpeak > 4000){
+      speak(pick(LINES.pat));
+    }
+    clearTimeout(patTimer);
+    patTimer = setTimeout(()=>{}, 0);
+  }
+  afterAct();
+});
+
+/* 选物种 */
+const spOverlay = document.getElementById("spOverlay");
+document.querySelectorAll("#spOverlay .sp").forEach(el => {
+  el.onclick = () => {
+    const idx = el.dataset.idx;
+    S.species = idx === "r" ? Math.floor(Math.random()*SPECIES.length) : parseInt(idx, 10);
+    S.speciesChosen = true;
+    spOverlay.classList.remove("show");
+    save(); render();
+    pushLog("🥚 你选择了「" + el.dataset.name + "」！点蛋 8 下催它孵化吧");
+    toast("🥚 " + el.dataset.name + "宠物蛋到手！");
+  };
+});
+
+/* ---------- 装扮商店 ---------- */
+const shopOverlay = document.getElementById("shopOverlay");
+document.getElementById("btnDress").onclick = () => {
+  renderShop();
+  shopOverlay.classList.add("show");
+};
+function closeShop(){ shopOverlay.classList.remove("show"); }
+
+function renderShop(){
+  document.getElementById("shopCoin").textContent = S.coins;
+  const g = document.getElementById("shopGrid");
+  g.innerHTML = "";
+  for(const it of ITEMS){
+    const owned = S.wardrobe.includes(it.id);
+    const equipped = S.equipped[it.slot] === it.id;
+    const d = document.createElement("div");
+    d.className = "sitem" + (equipped ? " equipped" : owned ? " owned" : "");
+    d.innerHTML = '<span class="si">' + it.emoji + '</span>' + it.name + '<br>' +
+      (equipped ? "已穿戴·点击卸下" : owned ? "点击穿戴" : "🪙 " + it.price);
+    d.onclick = () => shopClick(it);
+    g.appendChild(d);
+  }
+}
+function shopClick(it){
+  if(S.equipped[it.slot] === it.id){
+    S.equipped[it.slot] = null;
+    pushLog("👗 卸下了「" + it.name + "」");
+  }else if(S.wardrobe.includes(it.id)){
+    S.equipped[it.slot] = it.id;
+    pushLog("👗 戴上了「" + it.name + "」");
+    mood("😎"); burst(it.emoji, 3);
+  }else{
+    if(S.coins < it.price){ toast("🪙 金币不够，去陪玩/训练赚钱吧"); return; }
+    S.coins -= it.price;
+    S.wardrobe.push(it.id);
+    S.equipped[it.slot] = it.id;
+    mood("🥳"); burst("🎀", 4);
+    pushLog("🛍️ 买下并戴上「" + it.name + "」，花费 " + it.price + " 🪙");
+  }
+  save(); render(); renderShop();
+}
+/* 已穿戴饰品的叠加 HTML */
+function outfitHTML(){
+  let h = "";
+  for(const slot of ["hat","glasses","neck"]){
+    const id = S.equipped[slot];
+    if(!id) continue;
+    const it = ITEMS.find(x => x.id === id);
+    if(it) h += '<span class="outfit o-' + slot + '">' + it.emoji + '</span>';
+  }
+  return h;
+}
+
+/* ---------- 陪玩点击小游戏 ---------- */
+const gameOverlay = document.getElementById("gameOverlay");
+let gState = "idle", gTaps = 0, gTimer = null;
+
+function currentPetEmoji(){ return SPECIES[S.species][stageIdx()]; }
+
+function openGame(){
+  if(!needAwake() || !stage0Block()) return;
+  if(S.energy < 15){ toast("⚡ 太累了，玩不动了"); return; }
+  if(S.sick){ toast("😷 生病了，先治疗再玩"); return; }
+  gState = "ready"; gTaps = 0;
+  document.getElementById("gPet").textContent = currentPetEmoji();
+  document.getElementById("gScore").textContent = "❤️ 0";
+  document.getElementById("gTime").style.width = "100%";
+  document.getElementById("gTitle").textContent = "🎾 陪玩时间！";
+  document.getElementById("gDesc").textContent = "10 秒内疯狂点它，攒爱心换奖励！";
+  const b = document.getElementById("gBtn");
+  b.textContent = "开始！"; b.style.display = "";
+  gameOverlay.classList.add("show");
+}
+document.getElementById("gBtn").onclick = () => {
+  if(gState === "ready"){
+    gState = "playing"; gTaps = 0;
+    document.getElementById("gBtn").style.display = "none";
+    const t0 = Date.now();
+    gTimer = setInterval(() => {
+      const left = 10000 - (Date.now() - t0);
+      document.getElementById("gTime").style.width = Math.max(0, left / 100) + "%";
+      if(left <= 0) endGame();
+    }, 100);
+  }else if(gState === "done"){
+    gameOverlay.classList.remove("show");
+    gState = "idle";
+  }
+};
+document.getElementById("gPet").onclick = (e) => {
+  if(gState !== "playing") return;
+  gTaps++;
+  document.getElementById("gScore").textContent = "❤️ " + gTaps;
+  const p = document.createElement("span");
+  p.className = "particle";
+  p.textContent = "❤️";
+  p.style.position = "fixed";
+  p.style.left = (e.clientX - 10) + "px";
+  p.style.top = (e.clientY - 10) + "px";
+  p.style.bottom = "auto";
+  p.style.zIndex = 70;
+  document.body.appendChild(p);
+  setTimeout(() => p.remove(), 1300);
+};
+function endGame(){
+  clearInterval(gTimer);
+  gState = "done";
+  const coins = Math.min(15, Math.floor(gTaps / 5));
+  const xp    = Math.min(20, Math.floor(gTaps / 3));
+  const happy = Math.min(25, Math.round(gTaps / 2));
+  S.coins += coins; gainXP(xp);
+  S.happy  = clamp(S.happy + happy);
+  S.energy = clamp(S.energy - 12);
+  S.hunger = clamp(S.hunger - 8);
+  const praise = gTaps >= 60 ? "神级手速！！" : gTaps >= 40 ? "太厉害了！" :
+                 gTaps >= 20 ? "玩得不错！" : "它还想再玩～";
+  document.getElementById("gTitle").textContent = praise;
+  document.getElementById("gDesc").textContent =
+    "点了 " + gTaps + " 次 ❤️ → 心情+" + happy + "、金币+" + coins + "、经验+" + xp;
+  speak(pick(LINES.play));
+  pushLog("🎾 陪玩小游戏：" + gTaps + " 连击，心情+" + happy + "，赚到 " + coins + " 🪙");
+  const b = document.getElementById("gBtn");
+  b.textContent = "完成"; b.style.display = "";
+  save(); render();
+}
+
+/* 重置：清档重开（双击确认，避免 confirm 被拦截） */
+let resetArmed = false, resetTO = null;
+document.getElementById("btnReset").onclick = () => {
+  const btn = document.getElementById("btnReset");
+  if(!resetArmed){
+    resetArmed = true;
+    btn.childNodes[1].textContent = "再点确认";
+    btn.classList.add("active");
+    toast("⚠️ 再点一次确认重置，全部进度将清空！");
+    resetTO = setTimeout(() => {
+      resetArmed = false;
+      btn.childNodes[1].textContent = "重置";
+      btn.classList.remove("active");
+    }, 3000);
+    return;
+  }
+  clearTimeout(resetTO);
+  skipSave = true;   // 关键：阻止 beforeunload 把旧存档写回
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  location.reload();
+};
+
+document.getElementById("nameOk").onclick = () => {
+  const v = document.getElementById("nameInput").value.trim();
+  if(v){ S.name = v; }
+  document.getElementById("nameOverlay").classList.remove("show");
+  pushLog("✏️ 名字定为「" + petName() + "」！");
+  afterAct();
+};
+
+function afterAct(){ save(); render(); }
+
+/* ---------- 特效 ---------- */
+const fxBox = document.getElementById("fx");
+function burst(emoji, n){
+  const stage = document.querySelector(".stage").getBoundingClientRect();
+  for(let i = 0; i < n; i++){
+    const p = document.createElement("span");
+    p.className = "particle";
+    p.textContent = emoji;
+    p.style.left = (stage.width/2 - 60 + Math.random()*120) + "px";
+    p.style.bottom = (90 + Math.random()*40) + "px";
+    p.style.animationDelay = (Math.random()*0.25) + "s";
+    fxBox.appendChild(p);
+    setTimeout(() => p.remove(), 1600);
+  }
+}
+const moodEl = document.getElementById("mood");
+let moodTO = null;
+function mood(emoji){
+  moodEl.textContent = emoji;
+  moodEl.style.opacity = 1;
+  clearTimeout(moodTO);
+  moodTO = setTimeout(() => moodEl.style.opacity = 0, 1500);
+}
+
+/* ---------- 日志 / Toast ---------- */
+const logBox = document.getElementById("log");
+function pushLog(msg){
+  const p = document.createElement("p");
+  const t = new Date();
+  p.textContent = "[" + pad(t.getHours()) + ":" + pad(t.getMinutes()) + "] " + msg;
+  logBox.prepend(p);
+  while(logBox.children.length > 30) logBox.lastChild.remove();
+}
+const pad = n => String(n).padStart(2, "0");
+let toastTO = null;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTO);
+  toastTO = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+/* ---------- 渲染 ---------- */
+function petName(){ return S.name || "小家伙"; }
+function barColor(v){
+  if(v > 60) return "var(--ok)";
+  if(v > 30) return "var(--warn)";
+  return "var(--bad)";
+}
+function render(){
+  const si = stageIdx();
+  const sp = SPECIES[S.species] || SPECIES[0];
+  const pet = document.getElementById("pet");
+  pet.innerHTML = sp[si] + outfitHTML();
+  pet.style.fontSize = STAGES[si].size + "px";
+  pet.classList.toggle("sleeping", S.sleeping);
+  pet.classList.toggle("sick", S.sick);
+  pet.classList.toggle("dirty", S.clean < 25);
+
+  document.getElementById("z1").style.display = S.sleeping ? "block" : "none";
+  document.getElementById("z2").style.display = S.sleeping ? "block" : "none";
+  document.getElementById("z3").style.display = S.sleeping ? "block" : "none";
+  document.body.classList.toggle("night", S.sleeping);
+
+  document.getElementById("petName").textContent = petName() + (S.sick ? " 😷" : "");
+  const next = STAGES[si+1];
+  document.getElementById("petStage").textContent =
+    STAGE_NAMES[si] + " · Lv." + (si+1) + (next ? " · 下级需 " + next.needXP + " 经验" : " · 已满级");
+  const cur = STAGES[si].needXP;
+  const pct = next ? ((S.xp - cur) / (next.needXP - cur)) * 100 : 100;
+  document.getElementById("xpFill").style.width = clamp(pct) + "%";
+
+  const map = [["hunger","Hunger"],["clean","Clean"],["happy","Happy"],["energy","Energy"],["health","Health"]];
+  for(const [key,id] of map){
+    const v = Math.round(S[key]);
+    const bar = document.getElementById("b"+id);
+    bar.style.width = v + "%";
+    bar.style.backgroundColor = barColor(v);
+    document.getElementById("v"+id).textContent = v;
+  }
+  document.getElementById("hudCoin").textContent = "🪙 " + S.coins;
+  document.getElementById("hudDay").textContent = "📅 第 " + (Math.floor((Date.now()-S.bornAt)/86400000)+1) + " 天";
+
+  document.getElementById("btnSleep").classList.toggle("active", S.sleeping);
+  document.getElementById("btnSleep").querySelector(".e").textContent = S.sleeping ? "☀️" : "😴";
+  document.getElementById("btnSleep").childNodes[1].textContent = S.sleeping ? "叫醒" : "睡觉";
+}
+
+/* ---------- 主循环（结算以时间戳为准，interval 只是触发器） ---------- */
+setInterval(() => {
+  if(document.hidden) return; // 后台不做事，回前台统一补偿
+  settleAway(false);
+  ambientChatter();
+}, 3000);
+
+/* ---------- 启动 ---------- */
+settleAway(true);   // 首次载入先结算离线时长
+render();
+if(!S.speciesChosen){
+  /* 新游戏：先选物种 */
+  document.getElementById("spOverlay").classList.add("show");
+}else if(!S.name && stageIdx() === 0){
+  pushLog("🥚 一颗神秘的蛋出现在你面前，点它几下试试？");
+}else{
+  pushLog("🐾 欢迎回来，" + petName() + " 很想你！");
+}
+</script>
+</body>
+</html>
